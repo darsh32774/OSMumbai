@@ -81,7 +81,7 @@ class GeminiQueryProcessor:
         Database Schema:
         {self.schema_info}
         
-        User Query: "{natural_language_query}"
+        User Query: '{natural_language_query}'
         
         Generate a SQL query that answers this question. Follow these guidelines:
         
@@ -132,18 +132,60 @@ class GeminiQueryProcessor:
             print(f"Query execution failed: {e}")
             raise Exception(f"Error executing query: {e}")
     
+    def find_geometry_column(self, result):
+        """Find which column contains the geometry data by checking for JSON format"""
+        for i, column in enumerate(result):
+            if column and isinstance(column, str):
+                try:
+                    data = json.loads(column)
+                    if isinstance(data, dict) and data.get('type') in ['Point', 'Polygon', 'LineString'] and 'coordinates' in data:
+                        return i
+                except (json.JSONDecodeError, TypeError):
+                    continue
+        return None
+    
+    def extract_coordinates(self, geom_data):
+        """Extract longitude and latitude from geometry data (Point, Polygon, or LineString)"""
+        try:
+            geom_type = geom_data.get('type')
+            coords = geom_data.get('coordinates')
+            
+            if geom_type == 'Point' and coords and len(coords) >= 2:
+                return coords[0], coords[1]  # lon, lat
+            elif geom_type == 'Polygon' and coords and len(coords) > 0:
+                # For polygon, use the centroid of the first ring
+                ring = coords[0]
+                if len(ring) > 0:
+                    # Calculate centroid
+                    lons = [point[0] for point in ring]
+                    lats = [point[1] for point in ring]
+                    centroid_lon = sum(lons) / len(lons)
+                    centroid_lat = sum(lats) / len(lats)
+                    return centroid_lon, centroid_lat
+            elif geom_type == 'LineString' and coords and len(coords) > 0:
+                # For line, use the first point
+                return coords[0][0], coords[0][1]  # lon, lat
+        except (IndexError, TypeError, KeyError):
+            pass
+        return None, None
+    
     def create_map(self, results, query_description):
         """Create a map with the query results"""
         if not results:
             return None
         
         try:
+            # Find which column contains the geometry data
+            geom_col = self.find_geometry_column(results[0])
+            if geom_col is None:
+                print("No valid geometry data found in results")
+                return None, 0
+            
             # Parse first result to get initial coordinates
-            first_geom = json.loads(results[0][2])
-            if first_geom.get('type') == 'Point' and 'coordinates' in first_geom:
-                coords = first_geom['coordinates']
-                lon, lat = coords[0], coords[1]
-                
+            first_geom = json.loads(results[0][geom_col])
+            lon, lat = self.extract_coordinates(first_geom)
+            
+            if lon is not None and lat is not None:
                 if 18.0 <= lat <= 20.0 and 72.0 <= lon <= 74.0:
                     m = folium.Map(location=[lat, lon], zoom_start=15)
                 else:
@@ -155,25 +197,31 @@ class GeminiQueryProcessor:
             valid_coords = []
             for i, result in enumerate(results):
                 try:
-                    if len(result) >= 3:  # Ensure we have geometry data
-                        geom, name, amenity = result[2], result[0], result[1]
-                        coords_data = json.loads(geom)
+                    if len(result) > geom_col:  # Ensure we have geometry data
+                        geom = result[geom_col]
+                        name = result[0]  # Name is always first column
+                        amenity = result[1] if len(result) > 1 else "Unknown"  # Amenity is usually second
                         
-                        if coords_data.get('type') == 'Point' and 'coordinates' in coords_data:
-                            coords = coords_data['coordinates']
-                            lon, lat = coords[0], coords[1]
+                        coords_data = json.loads(geom)
+                        lon, lat = self.extract_coordinates(coords_data)
+                        
+                        if lon is not None and lat is not None and 18.0 <= lat <= 20.0 and 72.0 <= lon <= 74.0:
+                            # Find area column (usually the last column that's not geometry)
+                            suburb = "Unknown"
+                            for j, col in enumerate(result):
+                                if j != geom_col and j != 0 and j != 1 and col and not col.startswith('{'):
+                                    suburb = col
+                                    break
                             
-                            if 18.0 <= lat <= 20.0 and 72.0 <= lon <= 74.0:
-                                suburb = result[3] if len(result) > 3 else "Unknown"
-                                popup_text = f"<b>{name}</b><br>Type: {amenity}<br>Area: {suburb}<br>Coords: {lat:.6f}, {lon:.6f}"
-                                
-                                folium.Marker(
-                                    [lat, lon], 
-                                    popup=popup_text,
-                                    tooltip=f"{name} ({amenity})"
-                                ).add_to(m)
-                                
-                                valid_coords.append([lat, lon])
+                            popup_text = f"<b>{name}</b><br>Type: {amenity}<br>Area: {suburb}<br>Coords: {lat:.6f}, {lon:.6f}"
+                            
+                            folium.Marker(
+                                [lat, lon], 
+                                popup=popup_text,
+                                tooltip=f"{name} ({amenity})"
+                            ).add_to(m)
+                            
+                            valid_coords.append([lat, lon])
                 except Exception as e:
                     print(f"Warning: Could not add marker for result {i}: {e}")
                     continue
