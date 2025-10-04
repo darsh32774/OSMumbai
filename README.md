@@ -38,14 +38,20 @@ google-generativeai
 
 ## Database Setup
 
-1. **Install PostgreSQL and PostGIS**
+1. **Download OSM PBF file**
+
+The `.pbf` file is too large for GitHub, so download it directly:
+
+[Download Western Zone OSM PBF](https://download.geofabrik.de/asia/india/western-zone-latest.osm.pbf)
+
+2. **Install PostgreSQL and PostGIS**
 
 ```bash
 sudo apt update
 sudo apt install postgresql postgresql-contrib postgis postgresql-14-postgis-3
 ```
 
-2. **Create a database**
+3. **Create a database**
 
 ```bash
 sudo -u postgres psql
@@ -56,16 +62,16 @@ CREATE EXTENSION hstore;
 CREATE EXTENSION pg_trgm;
 ```
 
-3. **Import OSM `.pbf` file using `osm2pgsql`**
+4. **Import OSM `.pbf` file using `osm2pgsql`**
 
 ```bash
 sudo apt install osm2pgsql
-osm2pgsql -d mumbai -U your_postgres_user --create --slim -G --hstore your_file.pbf
+osm2pgsql -d mumbai -U your_postgres_user --create --slim -G --hstore western-zone-latest.osm.pbf
 ```
 
 > This will populate the database with tables: `planet_osm_point`, `planet_osm_polygon`, `planet_osm_line`.
 
-4. **Verify tables**
+5. **Verify tables**
 
 ```sql
 \dt
