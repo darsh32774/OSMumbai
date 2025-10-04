@@ -1,5 +1,10 @@
-psycopg2-binary==2.9.9
-tabulate==0.9.0
-folium==0.15.0
-google-generativeai==0.3.2
-python-dotenv==1.0.0
+psycopg2
+tabulate
+folium
+python-dotenv
+google-generativeai
+
+# Notes:
+# - PostgreSQL and PostGIS are system-level dependencies and must be installed separately.
+# - Ensure the database has the extensions: postgis, hstore, pg_trgm.
+# - osm2pgsql is required to import the .pbf file into PostgreSQL.
