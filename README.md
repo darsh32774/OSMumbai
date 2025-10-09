@@ -62,7 +62,7 @@ sudo -u postgres psql
 ```
 
 You should see the psql prompt:
-```sql
+```bash
 postgres=#
 ```
 
@@ -110,12 +110,20 @@ osm2pgsql -d mumbai -U your_username -W -H 127.0.0.1 --create --slim -G --hstore
 
 ### 8. **Verify tables**
 
+Open the PostgreSQL shell: 
+
 ```bash
 sudo -u postgres psql
 ```
+
+Connect to `mumbai` database:
+
 ```bash
 \c mumbai
 ```
+
+List Tables:
+
 ```bash
 \dt
 ```
