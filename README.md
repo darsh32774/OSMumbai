@@ -138,10 +138,10 @@ You should see `planet_osm_point`, `planet_osm_polygon`, `planet_osm_line`.
 
 ```bash
 # Create a virtual environment
-python3 -m venv .venv
+python3 -m venv venv
 
 # Activate the virtual environment
-source .venv/bin/activate
+source venv/bin/activate
 
 # Upgrade pip inside the environment
 pip install --upgrade pip
