@@ -168,7 +168,7 @@ PASSWORD=your_password
 ## Running the Query Processor
 
 ```bash
-python your_script.py
+python gemini_query_processor.py
 ```
 
 * Enter queries in natural language, e.g.:
