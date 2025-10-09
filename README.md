@@ -132,22 +132,25 @@ You should see `planet_osm_point`, `planet_osm_polygon`, `planet_osm_line`.
 
 ---
 
-## Setup Python Environment
+## Python Setup (Virtual Environment)
 
-1. **Clone this repository**
-
-```bash
-git clone <repo_url>
-cd <repo_folder>
-```
-
-2. **Install Python dependencies**
+### It is recommended to use a virtual environment for installing dependencies:
 
 ```bash
+# Create a virtual environment
+python3 -m venv .venv
+
+# Activate the virtual environment
+source .venv/bin/activate
+
+# Upgrade pip inside the environment
+pip install --upgrade pip
+
+# Install project dependencies
 pip install -r requirements.txt
 ```
 
-3. **Set up Gemini API Key**
+### **Set up Gemini API Key**
 
 Create a `.env` file in the project root:
 
