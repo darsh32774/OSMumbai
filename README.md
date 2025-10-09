@@ -150,12 +150,17 @@ pip install --upgrade pip
 pip install -r requirements.txt
 ```
 
-### **Set up Gemini API Key**
+### 8. Set Up the `.env` File
 
-Create a `.env` file in the project root:
+Create a `.env` file in the root of your project:
 
-```
-GEMINI_API_KEY=your_api_key_here
+```env
+# Google Gemini AI API key
+GEMINI_API_KEY=your_gemini_api_key_here
+
+# PostgreSQL database credentials
+USERNAME=your_username
+PASSWORD=your_password
 ```
 
 ---
