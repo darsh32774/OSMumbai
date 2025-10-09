@@ -46,7 +46,7 @@ Download the latest Western Zone OSM extract (Mumbai area) using `wget`:
 wget -O western-zone-latest.osm.pbf https://download.geofabrik.de/asia/india/western-zone-latest.osm.pbf
 ```
 
-2. **Install PostgreSQL, PostGIS and osm2pgsql**
+### 2. **Install PostgreSQL, PostGIS and osm2pgsql**
 
 ```bash
 sudo apt update
@@ -62,7 +62,7 @@ sudo -u postgres psql
 ```
 
 You should see the psql prompt:
-```bash
+```sql
 postgres=#
 ```
 
