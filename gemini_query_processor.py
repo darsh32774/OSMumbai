@@ -24,8 +24,8 @@ class GeminiQueryProcessor:
         self.conn = psycopg2.connect(
             host="localhost",
             database="mumbai",
-            user="your-username",
-            password="your-password"
+            user=os.getenv('USERNAME'),
+            password=os.getenv('PASSWORD')
         )
         self.cur = self.conn.cursor()
         
