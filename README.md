@@ -38,42 +38,85 @@ google-generativeai
 
 ## Database Setup
 
-1. **Download OSM PBF file**
+### 1. Download the OSM PBF File
 
-The `.pbf` file is too large for GitHub, so download it directly:
+Download the latest Western Zone OSM extract (Mumbai area) using `wget`:
 
-[Download Western Zone OSM PBF](https://download.geofabrik.de/asia/india/western-zone-latest.osm.pbf)
+```bash
+wget -O western-zone-latest.osm.pbf https://download.geofabrik.de/asia/india/western-zone-latest.osm.pbf
+```
 
-2. **Install PostgreSQL and PostGIS**
+2. **Install PostgreSQL, PostGIS and osm2pgsql**
 
 ```bash
 sudo apt update
-sudo apt install postgresql postgresql-contrib postgis postgresql-14-postgis-3
+sudo apt install postgresql postgresql-contrib postgis osm2pgsql
 ```
 
-3. **Create a database**
+### 3. Connect to PostgreSQL
+
+Switch to the `postgres` system user and open the PostgreSQL shell:
 
 ```bash
 sudo -u postgres psql
-CREATE DATABASE mumbai;
+```
+
+You should see the psql prompt:
+```bash
+postgres=#
+```
+
+### 4. Create a PostgreSQL User and Database
+
+Inside the `psql` shell, run the following commands to create a new user, give them permissions to create databases, and create the `mumbai` database:
+
+```sql
+CREATE USER your_username WITH PASSWORD 'your_password';
+ALTER USER your_username CREATEDB;
+CREATE DATABASE mumbai OWNER your_username;
+```
+
+### 5. Connect to the `mumbai` Database
+
+Inside the `psql` shell, connect to the newly created database:
+
+```sql
 \c mumbai
+```
+
+You should now see the prompt change to indicate you are connected to the mumbai database:
+```bash
+mumbai=#
+```
+
+### 6. Enable Required PostgreSQL Extensions
+
+While connected to the `mumbai` database, run the following commands to enable the necessary extensions:
+
+```sql
 CREATE EXTENSION postgis;
 CREATE EXTENSION hstore;
 CREATE EXTENSION pg_trgm;
 ```
 
-4. **Import OSM `.pbf` file using `osm2pgsql`**
+### 7. Import the OSM Data into PostgreSQL
+
+Use `osm2pgsql` to populate the `mumbai` database with the downloaded OSM PBF file. Replace `osm_user` with the database user you created and connect via `127.0.0.1`:
 
 ```bash
-sudo apt install osm2pgsql
-osm2pgsql -d mumbai -U your_postgres_user --create --slim -G --hstore western-zone-latest.osm.pbf
+osm2pgsql -d mumbai -U your_username -W -H 127.0.0.1 --create --slim -G --hstore western-zone-latest.osm.pbf
 ```
-
 > This will populate the database with tables: `planet_osm_point`, `planet_osm_polygon`, `planet_osm_line`.
 
-5. **Verify tables**
+### 8. **Verify tables**
 
-```sql
+```bash
+sudo -u postgres psql
+```
+```bash
+\c mumbai
+```
+```bash
 \dt
 ```
 
