@@ -2,7 +2,7 @@ fastapi
 uvicorn
 psycopg2-binary
 requests
-google-genai
+google-generativeai
 python-dotenv
 tabulate
 folium
