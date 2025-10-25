@@ -1,0 +1,13 @@
+services:
+- type: web
+  name: mumbai-osm-backend
+  env: docker
+  dockerfilePath: Dockerfile
+  healthCheckPath: /
+  # The free tier automatically sleeps after 15 minutes of inactivity
+  plan: free
+  
+  # IMPORTANT: Environment variables must be set manually in the Render console 
+  # for secrets like API keys and database credentials.
+  # Do not define secrets here.
+  # The service will run on the default exposed port 8000
