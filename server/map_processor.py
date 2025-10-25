@@ -33,7 +33,7 @@ def create_folium_map(geojson_features: List[Dict[str, Any]]) -> str:
             # For polygons/lines, calculating a center is complex, so we'll rely on fit_bounds later.
             
     # 1. Initialize Map
-    m = folium.Map(location=[start_lat, start_lon], zoom_start=13)
+    m = folium.Map(location=[start_lat, start_lon], zoom_start=13, tiles='CartoDB.DarkMatter')
 
     # 2. Prepare GeoJSON FeatureCollection
     geojson_layer = {
