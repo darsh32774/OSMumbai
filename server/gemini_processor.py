@@ -3,26 +3,20 @@ from dotenv import load_dotenv
 import os
 import re
 
-# Load environment variables. This is crucial for accessing the API Key.
 load_dotenv()
 
-# --- CONFIGURATION ---
 MODEL_NAME = 'gemini-2.5-pro'
 
-# Configure Gemini API
 API_KEY = os.getenv('GEMINI_API_KEY')
 if not API_KEY:
-    # This check ensures the server stops if the key is missing.
     raise ValueError("GEMINI_API_KEY environment variable is not set.")
 genai.configure(api_key=API_KEY)
 
-# Initialize the Generative Model globally for performance
 try:
     _model = genai.GenerativeModel(MODEL_NAME)
 except Exception as e:
     raise RuntimeError(f"Failed to initialize Gemini Model: {e}")
 
-# Database schema information (made global for the prompt)
 SQL_SCHEMA = """
 Database Schema for Mumbai OpenStreetMap data:
 
@@ -60,14 +54,7 @@ Common query patterns:
 - Get coordinates: ST_AsGeoJSON(ST_Transform(way, 4326))
 """
 
-# --- Core Function ---
-
 def generate_sql_query(natural_language_query: str) -> str:
-    """
-    Convert natural language query to a cleaned, single SQL SELECT statement 
-    using the Gemini model.
-    """
-    
     prompt = f"""
 You are a SQL expert for a PostgreSQL database containing Mumbai OpenStreetMap data.
 
@@ -94,19 +81,14 @@ The query should be ready to execute directly. DO NOT include a semicolon (;) at
 """
     
     try:
-        # 1. Generate content
         response = _model.generate_content(prompt)
         sql_query = response.text.strip()
         
-        # 2. Cleanup: Remove markdown and whitespace
         sql_query = re.sub(r'^```sql\s*', '', sql_query, flags=re.MULTILINE)
         sql_query = re.sub(r'\s*```$', '', sql_query, flags=re.MULTILINE)
         
-        # 3. CRITICAL Cleanup: Ensure only a single statement remains and strip trailing semicolon
-        # This prevents the "only single SELECT queries allowed" error.
         sql_query = sql_query.split(';')[0].strip()
         
-        # 4. Final Validation: Must be a SELECT statement
         if not sql_query.upper().startswith("SELECT"):
             raise ValueError(f"Gemini returned non-SELECT output: {sql_query[:50]}...")
             
