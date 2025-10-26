@@ -6,7 +6,7 @@ import uvicorn
 
 from server.gemini_processor import generate_sql_query
 from server.database_processor import execute_query_raw 
-from server.map_processor import create_folium_map
+from server.map_processor import create_folium_map 
 
 app = FastAPI()
 
@@ -28,11 +28,6 @@ def read_root():
 
 @app.post("/nl-to-map")
 async def nl_to_map(request: dict):
-    """
-    Endpoint to convert a Natural Language query to a Map data.
-    The response format is fixed to match the client's expectation: 
-    {'sql', 'rows_count', 'headers', 'display_rows', 'map_html'}
-    """
     query = request.get("query")
     if not query:
         raise HTTPException(status_code=400, detail="Query is required")
@@ -48,7 +43,8 @@ async def nl_to_map(request: dict):
         geom_col_index = None
 
         for i, h in enumerate(headers):
-            if h.lower() in ["geojson", "st_asgeojson", "coordinates"]:
+            h_lower = h.lower()
+            if h_lower in ["geojson", "st_asgeojson", "coordinates"] or 'st_asgeojson(' in h_lower:
                 geom_col_index = i
                 break
         
@@ -58,7 +54,11 @@ async def nl_to_map(request: dict):
             if geom_col_index is not None:
                 geojson_str = row[geom_col_index]
                 if geojson_str:
-                    geojson_obj = json.loads(geojson_str)
+                    try:
+                        geojson_obj = json.loads(geojson_str)
+                    except (json.JSONDecodeError, TypeError) as decode_err:
+                        print(f"Error decoding GeoJSON string: {decode_err} from data: {geojson_str[:100]}...")
+                        continue 
                     
                     properties = {
                         headers[i]: value
@@ -80,16 +80,17 @@ async def nl_to_map(request: dict):
         else:
              display_headers = headers
 
-        map_html = None
-        if geojson_features:
-            map_html = create_folium_map(geojson_features)
+        final_geojson_dict = create_folium_map(geojson_features)
+        
+        print(f"GeoJSON Features Count: {len(geojson_features)}")
 
         return JSONResponse(content={
             "sql": sql, 
             "rows_count": len(db_rows), 
             "headers": display_headers,
             "display_rows": display_rows,
-            "map_html": map_html
+            "geo_json_features": final_geojson_dict, 
+            "map_html": final_geojson_dict 
         })
 
     except RuntimeError as e:
@@ -101,4 +102,3 @@ async def nl_to_map(request: dict):
     except Exception as e:
         print(f"An unexpected error occurred: {e}")
         raise HTTPException(status_code=500, detail="An unexpected error occurred.")
-        
