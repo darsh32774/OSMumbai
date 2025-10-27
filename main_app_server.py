@@ -19,9 +19,9 @@ async def startup_event():
     global global_chat_session
     try:
         global_chat_session = initialize_sql_chat(client)
-        print("✅ Gemini Chat Session Initialized successfully.")
+        print("Gemini Chat Session Initialized successfully.")
     except Exception as e:
-        print(f"❌ CRITICAL ERROR: Could not initialize Gemini Chat Session: {e}")
+        print(f"CRITICAL ERROR: Could not initialize Gemini Chat Session: {e}")
 
 origins = ["*"]
 app.add_middleware(
