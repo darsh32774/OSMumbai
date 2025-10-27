@@ -1,98 +1,82 @@
-import google.generativeai as genai
+import google.genai as genai
 from dotenv import load_dotenv
 import os
 import re
+from typing import Any
 
 load_dotenv()
 
-MODEL_NAME = 'gemini-2.5-pro'
+MODEL_NAME = 'gemini-2.5-flash-lite'
 
 API_KEY = os.getenv('GEMINI_API_KEY')
 if not API_KEY:
     raise ValueError("GEMINI_API_KEY environment variable is not set.")
-genai.configure(api_key=API_KEY)
 
 try:
-    _model = genai.GenerativeModel(MODEL_NAME)
+    client = genai.Client()
 except Exception as e:
-    raise RuntimeError(f"Failed to initialize Gemini Model: {e}")
+    raise RuntimeError(f"Failed to initialize Gemini Client: {e}")
 
-SQL_SCHEMA = """
-Database Schema for Mumbai OpenStreetMap data:
+SQL_SCHEMA_COMPRESSED = """
+Tables (PostgreSQL/PostGIS):
+1. planet_osm_point (name, amenity, shop, tourism, leisure, education, way:geometry)
+2. planet_osm_polygon (name, place, admin_level, way:geometry)
+3. planet_osm_line (name, highway, way:geometry)
 
-Tables:
-1. planet_osm_point - Contains point features like amenities, shops, etc.
-   - name: Name of the location
-   - amenity: Type of amenity (restaurant, hospital, school, etc.)
-   - way: Geometry column (PostGIS)
-   - shop: Type of shop
-   - tourism: Tourism-related features
-   - leisure: Leisure facilities
-   - education: Educational institutions
-   
-2. planet_osm_polygon - Contains area features like suburbs, neighborhoods
-   - name: Name of the area (suburb, locality)
-   - way: Geometry column (PostGIS)
-   - place: Type of place (suburb, city, etc.)
-   - admin_level: Administrative level
-   
-3. planet_osm_line - Contains linear features like roads
-   - name: Name of the road
-   - highway: Type of highway
-   - way: Geometry column (PostGIS)
-
-Key relationships and functions to use:
-- Use ST_Within() to find points within polygons (e.g., amenities in suburbs)
-- Use ST_DWithin() for proximity searches (PostGIS is projected, use meters)
-- Use similarity() with pg_trgm for fuzzy text matching
-- Always transform coordinates to WGS84 (EPSG:4326) using ST_Transform(way, 4326)
-- Use ST_AsGeoJSON() to get coordinates for mapping
-
-Common query patterns:
-- Find amenities in a specific area: JOIN point and polygon tables with ST_Within()
-- Find nearby amenities: Use ST_DWithin() for distance-based searches
-- Get coordinates: ST_AsGeoJSON(ST_Transform(way, 4326))
+Functions: ST_Within(point, poly), ST_DWithin(geom, geom, meters), similarity(col, text).
+Output MUST be ST_AsGeoJSON(ST_Transform(way, 4326)).
+Limit results to 50.
 """
 
-def generate_sql_query(natural_language_query: str) -> str:
-    prompt = f"""
+SYSTEM_INSTRUCTION = f"""
 You are a SQL expert for a PostgreSQL database containing Mumbai OpenStreetMap data.
+Your sole purpose is to convert a user's natural language query into a single, executable SQL SELECT statement based on the following schema and rules.
 
-Database Schema:
-{SQL_SCHEMA}
+Schema:
+{SQL_SCHEMA_COMPRESSED}
 
-User Query: "{natural_language_query}"
-
-Generate a SQL query that answers this question. Follow these guidelines:
-
-1. Use proper JOINs between planet_osm_point and planet_osm_polygon when searching for amenities in areas.
-2. Use ST_Within() to find points within polygons.
-3. Use similarity() for fuzzy text matching on names.
-4. Always transform coordinates to WGS84: ST_Transform(way, 4326).
-5. Use ST_AsGeoJSON() to get coordinates for mapping.
-6. Include LIMIT to prevent overwhelming results (typically 50-100).
-7. Order results by relevance (similarity scores, distance, etc.)
-8. Embed the actual values directly in the query (no placeholders).
-9. Use single quotes around string values.
-10. For location matching, use similarity() with a threshold of 0.3 or higher.
-
-Return ONLY the SQL query, no explanations or markdown formatting.
-The query should be ready to execute directly. DO NOT include a semicolon (;) at the end of the query.
+Rules:
+1. Always use single quotes for string values.
+2. DO NOT include the final semicolon (;).
+3. DO NOT use markdown, explanations, or any text other than the SQL query itself.
+4. For general location matching, use similarity() (threshold >= 0.7).
+5. **MANDATORY AREA SEARCH LOGIC (Must start with WITH/CTEs and use fuzzy matching):**
+   When searching for features (e.g., 'hospitals', 'shops') *within* a named region (e.g., 'Goregaon'), you MUST define the boundary using two Common Table Expressions (CTEs): AreaCandidate and SelectedArea.
+   - The query MUST begin with the WITH keyword defining AreaCandidate.
+   - CTE 1 (AreaCandidate): UNION ALL of two lookups (Priority 1: Polygon, Priority 2: Point-Buffer). You MUST use the similarity function with a threshold of at least 0.1 on the 'name' column, replacing 'REGION_NAME' with the actual name from the user's query in all instances.
+     - Priority 1: Polygon lookup (SELECT ST_COLLECT(way) AS geom, 1 AS priority FROM planet_osm_polygon WHERE similarity(name, 'REGION_NAME') > 0.3 AND (place IS NOT NULL OR admin_level IS NOT NULL) GROUP BY priority)
+     - Priority 2: Point-Buffer lookup (SELECT ST_Transform(ST_Buffer(ST_Transform(way, 4326)::geography, 1000)::geometry, ST_SRID(way)) AS geom, 2 AS priority FROM planet_osm_point WHERE similarity(name, 'REGION_NAME') > 0.8)
+   - CTE 2 (SelectedArea): Must follow AreaCandidate (e.g., , SelectedArea AS (SELECT geom FROM AreaCandidate ORDER BY priority LIMIT 1)).
+   - Final SELECT: The final SELECT MUST include the feature's name and geometry (e.g., SELECT amenities.name, ST_AsGeoJSON(ST_Transform(amenities.way, 4326)) FROM ...). JOIN the feature table (e.g., planet_osm_point AS amenities) with SelectedArea ON ST_Intersects(amenities.way, SelectedArea.geom).
 """
+
+
+def initialize_sql_chat(client: genai.Client):
+    try:
+        chat_session = client.chats.create(
+            model=MODEL_NAME,
+            config=genai.types.GenerateContentConfig(
+                system_instruction=SYSTEM_INSTRUCTION
+            )
+        )
+        return chat_session
+    except Exception as e:
+        raise RuntimeError(f"Failed to initialize Gemini Chat Session: {e}")
+
+def generate_sql_query_from_chat(chat_session: Any, natural_language_query: str) -> str:
+    user_prompt = f"User Query: {natural_language_query}"
     
     try:
-        response = _model.generate_content(prompt)
+        response = chat_session.send_message(user_prompt)
         sql_query = response.text.strip()
         
         sql_query = re.sub(r'^```sql\s*', '', sql_query, flags=re.MULTILINE)
         sql_query = re.sub(r'\s*```$', '', sql_query, flags=re.MULTILINE)
-        
         sql_query = sql_query.split(';')[0].strip()
         
-        if not sql_query.upper().startswith("SELECT"):
-            raise ValueError(f"Gemini returned non-SELECT output: {sql_query[:50]}...")
+        if not sql_query.upper().startswith(("SELECT", "WITH")):
+            raise ValueError(f"Gemini returned an invalid SQL start keyword: {sql_query[:50]}...")
             
         return sql_query
     except Exception as e:
         raise RuntimeError(f"Error generating SQL query for '{natural_language_query}': {e}")
-
