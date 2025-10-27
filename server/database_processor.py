@@ -10,14 +10,14 @@ DB_PASSWORD = os.getenv('SUPABASE_DB_PASSWORD')
 
 def execute_query_raw(sql_query: str) -> Tuple[List[str], List[Tuple[Any, ...]]]:
     if not all([DB_HOST, DB_NAME, DB_USER, DB_PASSWORD, DB_PORT]):
-          raise RuntimeError("Database connection details are incomplete.")
+        raise RuntimeError("Database connection details are incomplete.")
 
     cleaned_query = sql_query.strip().upper()
-    if not cleaned_query.startswith("SELECT"):
-        raise ValueError("SQL validation failed: only SELECT queries allowed")
+    if not cleaned_query.startswith(("SELECT", "WITH")):
+        raise ValueError("SQL validation failed: only SELECT or WITH queries allowed")
         
     if len(sql_query.split(';')) > 1 and sql_query.strip().endswith(';'):
-          sql_query = sql_query.strip().rstrip(';')
+        sql_query = sql_query.strip().rstrip(';')
 
     conn = None
     cur = None
@@ -41,7 +41,7 @@ def execute_query_raw(sql_query: str) -> Tuple[List[str], List[Tuple[Any, ...]]]
         cur.execute(sql_query)
         
         if cur.description:
-             headers = [desc[0] for desc in cur.description]
+            headers = [desc[0] for desc in cur.description]
 
         rows = cur.fetchall()
         
@@ -56,4 +56,3 @@ def execute_query_raw(sql_query: str) -> Tuple[List[str], List[Tuple[Any, ...]]]
             cur.close()
         if conn:
             conn.close()
-
